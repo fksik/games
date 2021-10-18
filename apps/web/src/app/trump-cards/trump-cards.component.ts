@@ -1,6 +1,9 @@
 import { Component, ElementRef, OnInit, Renderer2 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { FirebaseService } from '../firebase.service';
+import { Game } from './game/game';
 import { Table } from './ui/table';
 import { AspectRatio } from './utils/aspect-ratio';
 
@@ -21,10 +24,16 @@ export class TrumpCardsComponent implements OnInit {
   controls!: OrbitControls;
   private table: Table;
   private aspectRatio = new AspectRatio();
+  public showStartGame: boolean = false;
+  public waitingForUsers = false;
+  public game?: Game;
 
   constructor(
     private elementRef: ElementRef<HTMLElement>,
-    private renderer: Renderer2
+    private renderer: Renderer2,
+    private route: ActivatedRoute,
+    private router: Router,
+    private fb: FirebaseService
   ) {
     this.scene = new Scene();
     this.camera = new PerspectiveCamera(45, this.aspectRatio.value, 0.1, 1000);
@@ -33,8 +42,24 @@ export class TrumpCardsComponent implements OnInit {
     this.table = new Table(this.aspectRatio.value);
   }
 
-  ngOnInit(): void {
-    this.createScene();
+  async ngOnInit(): Promise<void> {
+    await this.createScene();
+    this.route.queryParamMap.subscribe({
+      next: (params) => {
+        const id = params.get('id');
+        if (id) {
+          this.showStartGame = false;
+          this.waitForUsers(id);
+        } else {
+          this.showStartGame = true;
+        }
+      },
+    });
+  }
+
+  async waitForUsers(id: string) {
+    this.waitingForUsers = true;
+    this.game = await Game.initiateGame(this.fb, id);
   }
 
   async createScene() {
@@ -52,7 +77,14 @@ export class TrumpCardsComponent implements OnInit {
     const table = await this.table.getGeometry();
     this.scene.add(table);
 
+    console.log(table);
+
     this.canvas.render(this.scene, this.camera);
     this.animate();
+  }
+
+  public async initiateGame() {
+    const { id: roomId } = await Game.initiateGame(this.fb);
+    this.router.navigate(['/', 'trump-cards'], { queryParams: { id: roomId } });
   }
 }

@@ -1,24 +1,28 @@
-import { v4 } from 'uuid';
-import { Card, Cards } from '../game/card';
+import { CardStats } from '../game/card-stats';
+import { IUser } from './user.model';
 
 export class User {
-  id = v4();
-  cardsInHard: Cards;
+  cardsInHard: Array<CardStats>;
   roundPlayed: boolean = false;
+  isMaster: boolean = false;
 
-  constructor(public name: string) {
+  constructor(public user: IUser) {
     this.cardsInHard = [];
   }
 
-  addCard(card: Card) {
+  addCard(card: CardStats) {
     this.cardsInHard.push(card);
   }
 
-  dropCard(): Card {
+  dropCard(): CardStats {
     if (this.cardsInHard.length > 0) {
       return this.cardsInHard.shift()!;
     }
     throw new Error('No Cards for the user');
+  }
+
+  get name() {
+    return this.user.name || this.user.id;
   }
 }
 

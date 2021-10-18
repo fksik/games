@@ -1,15 +1,69 @@
+import {
+  arrayUnion,
+  collection,
+  CollectionReference,
+  doc,
+  DocumentReference,
+  getDoc,
+  updateDoc,
+} from '@firebase/firestore';
+import { environment } from 'apps/web/src/environments/environment';
+import { addDoc } from 'firebase/firestore';
+import { v4 } from 'uuid';
+import { FirebaseService } from '../../firebase.service';
+import { IRoom } from '../user/room.model';
 import { User, Users } from '../user/user';
+import { IUser } from '../user/user.model';
 import { Round } from './round';
 
 export class Game {
+  static game: Game;
   users: Users = [];
   tableClean: boolean = true;
   round?: Round;
 
-  constructor(public master: User) {}
+  constructor(
+    private fb: FirebaseService,
+    private roomRef: DocumentReference<IRoom>
+  ) {}
 
-  static createGame(master: User): Game {
-    return new Game(master);
+  static async initiateGame(fb: FirebaseService, id?: string): Promise<Game> {
+    if (!id) {
+      return await Game.createRoom(fb);
+    } else {
+      return await Game.joinRoom(fb, id);
+    }
+  }
+
+  private static async createRoom(fb: FirebaseService) {
+    const roomRef = await addDoc<IRoom>(
+      collection(fb.store, 'room') as CollectionReference<IRoom>
+    );
+    this.game = new Game(fb, roomRef);
+    return this.game;
+  }
+
+  private static async joinRoom(fb: FirebaseService, id: string) {
+    const collectionRef = collection(
+      fb.store,
+      'rooms'
+    ) as CollectionReference<IRoom>;
+    const roomRef = doc<IRoom>(collectionRef, id);
+    const room = (await getDoc(roomRef)).data() as IRoom;
+
+    const existingUID = localStorage.getItem('uid');
+    const existingUser = room.users.find((_) => _.id === existingUID);
+    if (!(existingUID && existingUser)) {
+      const user: IUser = { id: v4(), isMaster: false };
+      const newUser = new User(user);
+      room.users.push(user);
+      await updateDoc(roomRef, {
+        answer: roomWithAnswer.answer,
+        users: arrayUnion(newUser),
+      });
+    }
+    this.game = new Game(fb, roomRef);
+    return this.game;
   }
 
   addUser(user: User): boolean {
@@ -22,14 +76,14 @@ export class Game {
 
   removeUser(user: User): boolean {
     if (this.hasUser(user)) {
-      this.users = this.users.filter((_) => _.id !== user.id);
+      this.users = this.users.filter((_) => _.user.id !== user.user.id);
       return true;
     }
     return false;
   }
 
   hasUser(user: User): boolean {
-    return this.users.findIndex((_) => _.id === user.id) >= 0;
+    return this.users.findIndex((_) => _.user.id === user.user.id) >= 0;
   }
 
   checkRoundComplete() {
@@ -51,5 +105,9 @@ export class Game {
 
   get usersCount() {
     return this.users.length;
+  }
+
+  public get id() {
+    return this.roomRef.id;
   }
 }
