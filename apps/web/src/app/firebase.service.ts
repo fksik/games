@@ -7,7 +7,8 @@ import {
   getFirestore,
 } from 'firebase/firestore';
 import { environment } from '../environments/environment';
-import { IRoom } from './trump-cards/user/room.model';
+import { IRoom } from './trump-cards/models/room.model';
+import { User } from './trump-cards/models/user';
 
 @Injectable({
   providedIn: 'root',
@@ -31,5 +32,11 @@ export class FirebaseService {
 
   get collection() {
     return collection(this.store, 'room') as CollectionReference<IRoom>;
+  }
+
+  getUserCollection(id: string) {
+    return collection(this.store, 'room', id, 'users') as CollectionReference<
+      Array<User>
+    >;
   }
 }

@@ -1,5 +1,5 @@
 import { Group } from 'three';
-import { User, Users } from '../user/user';
+import { User, Users } from '../models/user';
 import { Card, CARD_ASPECT_RATIO } from './card';
 
 type n = number;

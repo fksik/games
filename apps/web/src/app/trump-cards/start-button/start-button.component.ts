@@ -1,12 +1,7 @@
 import { Component, EventEmitter, Output } from '@angular/core';
-import { environment } from 'apps/web/src/environments/environment';
-import { addDoc, collection, CollectionReference } from 'firebase/firestore';
-import { v4 } from 'uuid';
+import { Router } from '@angular/router';
 import { FirebaseService } from '../../firebase.service';
 import { Game } from '../game/game';
-import { IRoom } from '../user/room.model';
-import { User } from '../user/user';
-import { IUser } from '../user/user.model';
 
 @Component({
   selector: 'games-start-button',
@@ -15,15 +10,32 @@ import { IUser } from '../user/user.model';
 })
 export class StartButtonComponent {
   @Output()
-  public initialize!: EventEmitter<void>;
-  constructor(private fb: FirebaseService) {}
+  public initialize: EventEmitter<void> = new EventEmitter();
+  private uname: string | null;
+  showReadUname = false;
 
-  ngOnInit(): void {}
+  constructor(private fb: FirebaseService, private router: Router) {
+    this.uname = localStorage.getItem('uname');
+  }
+
+  ngOnInit(): void {
+    const game = Game.checkIfHasGame();
+    if (game) {
+      this.router.navigate(['/', 'trump-cards'], { queryParams: { id: game } });
+    }
+  }
 
   async createGame() {
+    if (!this.uname) {
+      this.readUname();
+    }
     if (this.fb.isInitialized) {
       this.initialize.emit();
     }
+  }
+
+  private readUname() {
+    this.showReadUname = true;
   }
 
   public get isInitialized(): boolean {

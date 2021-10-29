@@ -1,0 +1,30 @@
+:host {
+  display: block;
+  position: fixed;
+  background: #3f7e499c;
+  width: 50%;
+  height: 45%;
+  border: 2px dashed #f1f1f1;
+  border-radius: 5px;
+  bottom: 5%;
+  right: 5%;
+  color: #f1f1f1;
+  padding: 1.5rem;
+  h2 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  ul {
+    li {
+      list-style: none;
+      &::before {
+        content: '•';
+        color: red;
+        display: inline-block;
+        width: 1em;
+        margin-left: -1em;
+      }
+    }
+  }
+}

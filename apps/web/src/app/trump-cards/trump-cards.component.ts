@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { FirebaseService } from '../firebase.service';
+import { ROOM_NOT_EXISTS } from './constants';
 import { Game } from './game/game';
 import { Table } from './ui/table';
 import { AspectRatio } from './utils/aspect-ratio';
@@ -27,6 +28,7 @@ export class TrumpCardsComponent implements OnInit {
   public showStartGame: boolean = false;
   public waitingForUsers = false;
   public game?: Game;
+  public showLobby: boolean = false;
 
   constructor(
     private elementRef: ElementRef<HTMLElement>,
@@ -58,8 +60,18 @@ export class TrumpCardsComponent implements OnInit {
   }
 
   async waitForUsers(id: string) {
-    this.waitingForUsers = true;
-    this.game = await Game.initiateGame(this.fb, id);
+    try {
+      this.waitingForUsers = true;
+      this.game = await Game.initiateGame(this.fb, id);
+      this.showLobby = true;
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === ROOM_NOT_EXISTS) {
+          Game.clearGameStorage();
+          this.router.navigate(['/', 'trump-cards']);
+        }
+      }
+    }
   }
 
   async createScene() {
@@ -76,8 +88,6 @@ export class TrumpCardsComponent implements OnInit {
 
     const table = await this.table.getGeometry();
     this.scene.add(table);
-
-    console.log(table);
 
     this.canvas.render(this.scene, this.camera);
     this.animate();

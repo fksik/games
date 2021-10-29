@@ -1,19 +1,19 @@
 import {
   arrayUnion,
-  collection,
-  CollectionReference,
   doc,
   DocumentReference,
   getDoc,
+  onSnapshot,
   updateDoc,
 } from '@firebase/firestore';
-import { environment } from 'apps/web/src/environments/environment';
 import { addDoc } from 'firebase/firestore';
+import { isEqual } from 'lodash';
 import { v4 } from 'uuid';
 import { FirebaseService } from '../../firebase.service';
-import { IRoom } from '../user/room.model';
-import { User, Users } from '../user/user';
-import { IUser } from '../user/user.model';
+import { GID_KEY, ROOM_NOT_EXISTS, UID_KEY } from '../constants';
+import { IRoom } from '../models/room.model';
+import { User, Users } from '../models/user';
+import { IUser } from '../models/user.model';
 import { Round } from './round';
 
 export class Game {
@@ -25,7 +25,22 @@ export class Game {
   constructor(
     private fb: FirebaseService,
     private roomRef: DocumentReference<IRoom>
-  ) {}
+  ) {
+    onSnapshot(roomRef, {
+      next: (snapshot) => {
+        const data = snapshot.data();
+        if (data) {
+          for (const user of data?.users) {
+            if (!this.hasUser(user)) {
+              const newUser = new User(user);
+              this.addUser(newUser);
+            }
+            this.compareAndUpdateUser(user);
+          }
+        }
+      },
+    });
+  }
 
   static async initiateGame(fb: FirebaseService, id?: string): Promise<Game> {
     if (!id) {
@@ -36,54 +51,71 @@ export class Game {
   }
 
   private static async createRoom(fb: FirebaseService) {
-    const roomRef = await addDoc<IRoom>(
-      collection(fb.store, 'room') as CollectionReference<IRoom>
-    );
-    this.game = new Game(fb, roomRef);
-    return this.game;
+    const user: IUser = { id: v4(), isMaster: true };
+    const newUser = new User(user);
+    const roomRef = await addDoc<IRoom>(fb.collection, { users: [user] });
+    const game = new Game(fb, roomRef);
+    this.game = game;
+    game.addUser(newUser);
+    Game.setGame(game.id);
+    Game.setUser(newUser.id);
+    return game;
   }
 
   private static async joinRoom(fb: FirebaseService, id: string) {
-    const collectionRef = collection(
-      fb.store,
-      'rooms'
-    ) as CollectionReference<IRoom>;
+    const collectionRef = fb.collection;
     const roomRef = doc<IRoom>(collectionRef, id);
-    const room = (await getDoc(roomRef)).data() as IRoom;
+    const docRef = await getDoc(roomRef);
+    if (!docRef.exists()) {
+      throw new Error(ROOM_NOT_EXISTS);
+    }
+    const room = docRef.data() as IRoom;
 
-    const existingUID = localStorage.getItem('uid');
+    const existingUID = Game.checkIfHasUser();
     const existingUser = room.users.find((_) => _.id === existingUID);
     if (!(existingUID && existingUser)) {
       const user: IUser = { id: v4(), isMaster: false };
-      const newUser = new User(user);
+      Game.setUser(user.id);
       room.users.push(user);
       await updateDoc(roomRef, {
-        answer: roomWithAnswer.answer,
-        users: arrayUnion(newUser),
+        users: arrayUnion(user),
       });
     }
+
     this.game = new Game(fb, roomRef);
+    for (const user of room.users) {
+      const newUser = new User(user);
+      this.game.addUser(newUser);
+    }
     return this.game;
   }
 
-  addUser(user: User): boolean {
-    if (this.hasUser(user)) {
+  addUser(user: User) {
+    if (!this.hasUser(user)) {
       this.users.push(user);
-      return true;
+      return;
     }
-    return false;
+    throw new Error('User already Exists');
   }
 
   removeUser(user: User): boolean {
     if (this.hasUser(user)) {
-      this.users = this.users.filter((_) => _.user.id !== user.user.id);
+      this.users = this.users.filter((_) => _.user.id !== user.id);
       return true;
     }
     return false;
   }
 
-  hasUser(user: User): boolean {
-    return this.users.findIndex((_) => _.user.id === user.user.id) >= 0;
+  getUser(id: string): User {
+    const user = this.users.find((_) => _.id === id);
+    if (user) {
+      return user;
+    }
+    throw new Error('User Not Found');
+  }
+
+  hasUser(user: IUser): boolean {
+    return this.users.findIndex((_) => _.user.id === user.id) >= 0;
   }
 
   checkRoundComplete() {
@@ -109,5 +141,33 @@ export class Game {
 
   public get id() {
     return this.roomRef.id;
+  }
+
+  public static checkIfHasUser(): string | null {
+    return localStorage.getItem(UID_KEY);
+  }
+
+  public static checkIfHasGame(): string | null {
+    return localStorage.getItem(GID_KEY);
+  }
+
+  public static setGame(name: string) {
+    localStorage.setItem(GID_KEY, name);
+  }
+
+  public static setUser(name: string) {
+    localStorage.setItem(UID_KEY, name);
+  }
+
+  static clearGameStorage() {
+    localStorage.removeItem(UID_KEY);
+    localStorage.removeItem(GID_KEY);
+  }
+
+  private compareAndUpdateUser(user: IUser) {
+    const refUser = this.getUser(user.id);
+    if (!isEqual(refUser.user, user)) {
+      refUser.user = user;
+    }
   }
 }

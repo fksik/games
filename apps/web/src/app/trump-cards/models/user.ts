@@ -24,6 +24,10 @@ export class User {
   get name() {
     return this.user.name || this.user.id;
   }
+
+  get  id() {
+    return this.user.id
+  }
 }
 
 export type Users = Array<User>;

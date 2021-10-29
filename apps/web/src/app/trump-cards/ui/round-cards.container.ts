@@ -1,5 +1,5 @@
 import { Color, Mesh, MeshBasicMaterial, PlaneGeometry } from 'three';
-import { Users } from '../user/user';
+import { Users } from '../models/user';
 import { RoundCards } from './round-cards';
 
 const Y_POSITION_PERCENT_FROM_TOP = 10;

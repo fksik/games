@@ -1,5 +1,7 @@
-import { User, Users } from '../user/user';
-import { Card, Cards } from './card';
+import { User, Users } from '../models/user';
+import { CardStats } from './card-stats';
+
+type Cards = Array<CardStats>;
 
 export class Round {
   roundCards: Cards = [];
@@ -8,19 +10,19 @@ export class Round {
   constructor(
     public allSegments: Array<string>,
     public segment: string,
-    public highCard: Card,
+    public highCard: CardStats,
     public highUser: User
   ) {
     this.highUser.roundPlayed = true;
   }
 
-  placeCard(card: Card, user: User) {
+  placeCard(card: CardStats, user: User) {
     this.decideHighCard(card, user);
     this.roundCards.push(card);
     user.roundPlayed = true;
   }
 
-  private decideHighCard(card: Card, user: User): void {
+  private decideHighCard(card: CardStats, user: User): void {
     const value = card.get(this.segment)!;
     const highCardValue = this.highCard.get(this.segment)!;
     if (value > highCardValue) {

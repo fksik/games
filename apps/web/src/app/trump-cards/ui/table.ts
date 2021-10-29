@@ -5,7 +5,7 @@ import {
   Texture,
   TextureLoader,
 } from 'three';
-import { Users } from '../user/user';
+import { Users } from '../models/user';
 import { RoundCardsContainer } from './round-cards.container';
 import { RoundHigh } from './round-high';
 

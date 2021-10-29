@@ -6,7 +6,7 @@ import {
   Shape,
   TextureLoader,
 } from 'three';
-import { User } from '../user/user';
+import { User } from '../models/user';
 
 type n = number;
 
