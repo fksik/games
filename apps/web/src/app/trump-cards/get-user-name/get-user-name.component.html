@@ -1,1 +1,4 @@
-<p>get-user-name works!</p>
+<form *ngIf="infoForm" [formGroup]="infoForm" class="form" (ngSubmit)="doneWithNameChanges()">
+  <input formControlName="name" placeholder="Name" class="name"/>
+  <button type="submit" class="submit-button">Done!</button>
+</form>

@@ -10,7 +10,7 @@ import { addDoc } from 'firebase/firestore';
 import { isEqual } from 'lodash';
 import { v4 } from 'uuid';
 import { FirebaseService } from '../../firebase.service';
-import { GID_KEY, ROOM_NOT_EXISTS, UID_KEY } from '../constants';
+import { GameErrors, GID_KEY, UID_KEY } from '../constants';
 import { IRoom } from '../models/room.model';
 import { User, Users } from '../models/user';
 import { IUser } from '../models/user.model';
@@ -42,16 +42,12 @@ export class Game {
     });
   }
 
-  static async initiateGame(fb: FirebaseService, id?: string): Promise<Game> {
-    if (!id) {
-      return await Game.createRoom(fb);
-    } else {
-      return await Game.joinRoom(fb, id);
-    }
+  static async initiateGame(fb: FirebaseService, name: string): Promise<Game> {
+    return await Game.createRoom(fb, name);
   }
 
-  private static async createRoom(fb: FirebaseService) {
-    const user: IUser = { id: v4(), isMaster: true };
+  private static async createRoom(fb: FirebaseService, name: string) {
+    const user: IUser = { id: v4(), isMaster: true, name };
     const newUser = new User(user);
     const roomRef = await addDoc<IRoom>(fb.collection, { users: [user] });
     const game = new Game(fb, roomRef);
@@ -62,24 +58,62 @@ export class Game {
     return game;
   }
 
-  private static async joinRoom(fb: FirebaseService, id: string) {
+  public static async checkIfExistingUser(fb: FirebaseService, roomId: string) {
+    const collectionRef = fb.collection;
+    const roomRef = doc<IRoom>(collectionRef, roomId);
+    const docRef = await getDoc(roomRef);
+    if (!docRef.exists()) {
+      throw new Error(GameErrors.ROOM_NOT_EXISTS);
+    }
+    const room = docRef.data() as IRoom;
+    const existingUID = Game.checkIfHasUser();
+    const existingUser = room.users.find((_) => _.id === existingUID);
+    if (!(existingUID && existingUser)) {
+      return false;
+    }
+    return true;
+  }
+
+  public static async joinAsExistingUser(fb: FirebaseService, id: string) {
     const collectionRef = fb.collection;
     const roomRef = doc<IRoom>(collectionRef, id);
     const docRef = await getDoc(roomRef);
     if (!docRef.exists()) {
-      throw new Error(ROOM_NOT_EXISTS);
+      throw new Error(GameErrors.ROOM_NOT_EXISTS);
+    }
+    const room = docRef.data() as IRoom;
+    this.game = new Game(fb, roomRef);
+    for (const user of room.users) {
+      const newUser = new User(user);
+      this.game.addUser(newUser);
+    }
+    return this.game;
+  }
+
+  public static async joinAsNewUser(
+    fb: FirebaseService,
+    id: string,
+    name: string
+  ) {
+    const collectionRef = fb.collection;
+    const roomRef = doc<IRoom>(collectionRef, id);
+    const docRef = await getDoc(roomRef);
+    if (!docRef.exists()) {
+      throw new Error(GameErrors.ROOM_NOT_EXISTS);
     }
     const room = docRef.data() as IRoom;
 
     const existingUID = Game.checkIfHasUser();
     const existingUser = room.users.find((_) => _.id === existingUID);
     if (!(existingUID && existingUser)) {
-      const user: IUser = { id: v4(), isMaster: false };
+      const user: IUser = { id: v4(), isMaster: false, name };
       Game.setUser(user.id);
       room.users.push(user);
       await updateDoc(roomRef, {
         users: arrayUnion(user),
       });
+    } else {
+      throw new Error();
     }
 
     this.game = new Game(fb, roomRef);

@@ -8,7 +8,7 @@ import { Users } from '../models/user';
 })
 export class LobbyComponent implements OnInit {
   @Input()
-  public users!: Users;
+  public users?: Users;
 
   constructor() {}
 

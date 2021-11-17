@@ -1,4 +1,7 @@
 <h2>Lobby!</h2>
-<ul>
-  <li *ngFor="let muser of users">{{ muser.user.id }}</li>
-</ul>
+<p *ngIf="!users; else usersRef" class="game-error">Game failed to Initialize</p>
+<ng-template #usersRef>
+  <ul>
+    <li *ngFor="let muser of users">{{ muser.user.id }}</li>
+  </ul>
+</ng-template>

@@ -1,6 +1,14 @@
-<games-start-button
-  *ngIf="showStartGame"
-  (initialize)="initiateGame()"
-></games-start-button>
-<games-lobby *ngIf="showLobby && game" [users]="game.users"></games-lobby>
-<games-get-user-name></games-get-user-name>
+<ng-container [ngSwitch]="gameUIState">
+  <games-start-button
+    *ngSwitchCase="gameUIStateValues.START_GAME"
+    (initialize)="initiateGame()"
+  ></games-start-button>
+  <games-lobby
+    *ngSwitchCase="gameUIStateValues.LOBBY"
+    [users]="game?.users"
+  ></games-lobby>
+  <games-get-user-name
+    *ngSwitch="gameUIStateValues.ENTER_NAME"
+    (name)="updateUserName($event)"
+  ></games-get-user-name>
+</ng-container>

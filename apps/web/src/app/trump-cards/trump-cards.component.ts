@@ -1,9 +1,17 @@
-import { Component, ElementRef, OnInit, Renderer2 } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  Renderer2,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { EventBusService } from '../event-bus.service';
 import { FirebaseService } from '../firebase.service';
-import { ROOM_NOT_EXISTS } from './constants';
+import { GameErrors, GameUIState } from './constants';
 import { Game } from './game/game';
 import { Table } from './ui/table';
 import { AspectRatio } from './utils/aspect-ratio';
@@ -13,7 +21,7 @@ import { AspectRatio } from './utils/aspect-ratio';
   templateUrl: './trump-cards.component.html',
   styleUrls: ['./trump-cards.component.scss'],
 })
-export class TrumpCardsComponent implements OnInit {
+export class TrumpCardsComponent implements OnInit, OnDestroy {
   private animate = () => {
     requestAnimationFrame(this.animate);
     this.controls.update();
@@ -25,17 +33,18 @@ export class TrumpCardsComponent implements OnInit {
   controls!: OrbitControls;
   private table: Table;
   private aspectRatio = new AspectRatio();
-  public showStartGame: boolean = false;
-  public waitingForUsers = false;
+  public gameUIState: GameUIState = GameUIState.NONE;
+  public gameUIStateValues = GameUIState;
   public game?: Game;
-  public showLobby: boolean = false;
+  private subscriptions: Array<Subscription> = [];
 
   constructor(
     private elementRef: ElementRef<HTMLElement>,
     private renderer: Renderer2,
     private route: ActivatedRoute,
     private router: Router,
-    private fb: FirebaseService
+    private fb: FirebaseService,
+    private eb: EventBusService
   ) {
     this.scene = new Scene();
     this.camera = new PerspectiveCamera(45, this.aspectRatio.value, 0.1, 1000);
@@ -50,10 +59,9 @@ export class TrumpCardsComponent implements OnInit {
       next: (params) => {
         const id = params.get('id');
         if (id) {
-          this.showStartGame = false;
           this.waitForUsers(id);
         } else {
-          this.showStartGame = true;
+          this.gameUIState = GameUIState.START_GAME;
         }
       },
     });
@@ -61,12 +69,17 @@ export class TrumpCardsComponent implements OnInit {
 
   async waitForUsers(id: string) {
     try {
-      this.waitingForUsers = true;
-      this.game = await Game.initiateGame(this.fb, id);
-      this.showLobby = true;
+      const existing = Game.checkIfExistingUser(this.fb, id);
+      if (!existing) {
+        const name = await this.getUserName();
+        this.game = await Game.joinAsNewUser(this.fb, id, name);
+      } else {
+        this.game = await Game.joinAsExistingUser(this.fb, id);
+      }
+      this.gameUIState = GameUIState.LOBBY;
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message === ROOM_NOT_EXISTS) {
+        if (error.message === GameErrors.ROOM_NOT_EXISTS) {
           Game.clearGameStorage();
           this.router.navigate(['/', 'trump-cards']);
         }
@@ -94,7 +107,28 @@ export class TrumpCardsComponent implements OnInit {
   }
 
   public async initiateGame() {
-    const { id: roomId } = await Game.initiateGame(this.fb);
+    const name = await this.getUserName();
+    const { id: roomId } = await Game.initiateGame(this.fb, name);
     this.router.navigate(['/', 'trump-cards'], { queryParams: { id: roomId } });
+  }
+
+  public async getUserName(): Promise<string> {
+    this.gameUIState = GameUIState.ENTER_NAME;
+    return new Promise((res) => {
+      const sub = this.eb.on<string>('get-name').subscribe((name) => {
+        res(name);
+        sub.unsubscribe();
+        this.gameUIState = GameUIState.NONE;
+      });
+      this.subscriptions.push(sub);
+    });
+  }
+
+  public updateUserName(name: string) {
+    this.eb.emit<string>('get-name', name);
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.forEach((_) => _.unsubscribe());
   }
 }
